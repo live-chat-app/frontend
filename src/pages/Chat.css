@@ -278,6 +278,7 @@
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  color: #374151;
 }
 
 .menu-btn:hover {
@@ -580,12 +581,12 @@
     height: 100vh;
   }
 
-  .sidebar-visible {
-    display: flex;
+  .sidebar-hidden {
+    display: none;
   }
 
-  .menu-btn {
-    display: block;
+  .sidebar-visible {
+    display: flex;
   }
 }
 
