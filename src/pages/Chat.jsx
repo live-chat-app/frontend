@@ -249,8 +249,8 @@ function Chat() {
 
           {/* Connection status */}
           <div className="connection-status">
-            <div className={`status-dot ${isConnected ? 'status-connected' : 'status-disconnected'}`}></div>
-            {isConnected ? 'Connected' : 'Disconnected'}
+            <div className={`status-dot ${isConnected === true ? 'status-connected' : isConnected === false ? 'status-disconnected' : 'status-connecting'}`}></div>
+            {isConnected === true ? 'Connected' : isConnected === false ? 'Disconnected' : 'Connecting...'}
           </div>
         </div>
 

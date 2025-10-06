@@ -78,6 +78,20 @@
   background-color: #f87171;
 }
 
+.status-connecting {
+  background-color: #fbbf24;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* Search */
 .search-container {
   padding: 16px;
