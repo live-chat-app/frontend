@@ -20,9 +20,13 @@ function Chat() {
   const [typingUsers, setTypingUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Fetch users and channels
   useEffect(() => {
@@ -170,17 +174,68 @@ function Chat() {
     }
   };
 
-  const sendMessage = () => {
-    if (!newMessage.trim() || !socket) return;
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const uploadFile = async () => {
+    if (!selectedFile) return null;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      setUploading(true);
+      const response = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('File upload error:', error);
+      alert('Failed to upload file');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if ((!newMessage.trim() && !selectedFile) || !socket) return;
+
+    let fileData = null;
+    if (selectedFile) {
+      fileData = await uploadFile();
+      if (!fileData) return; // Upload failed
+      console.log('Uploaded file data:', fileData);
+    }
+
+    // Determine message type based on file format, not resourceType
+    let messageType = 'text';
+    if (fileData) {
+      const imageFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+      messageType = imageFormats.includes(fileData.format.toLowerCase()) ? 'image' : 'file';
+    }
 
     const messageData = {
-      content: newMessage,
+      content: newMessage || '',
       channelId: activeChat.type === 'channel' ? activeChat.id : null,
       recipientId: activeChat.type === 'user' ? activeChat.id : null,
+      type: messageType,
+      fileUrl: fileData ? fileData.url : null,
     };
 
+    console.log('Sending message:', messageData);
     socket.emit('sendMessage', messageData);
     setNewMessage('');
+    setSelectedFile(null);
     handleTyping(false);
   };
 
@@ -380,7 +435,94 @@ function Chat() {
                       {msg.sender._id !== user.id && (
                         <p className="message-sender">{msg.sender.username}</p>
                       )}
-                      <p>{msg.content}</p>
+                      {msg.type === 'image' && msg.fileUrl ? (
+                        <div style={{ marginBottom: msg.content ? '8px' : '0' }}>
+                          <img
+                            src={msg.fileUrl}
+                            alt="Shared image"
+                            style={{
+                              width: '250px',
+                              height: '250px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              objectFit: 'cover',
+                              display: 'block'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setImagePreview(msg.fileUrl);
+                            }}
+                          />
+                        </div>
+                      ) : msg.type === 'file' && msg.fileUrl ? (
+                        <div
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Download file directly
+                            try {
+                              const response = await fetch(msg.fileUrl);
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = msg.fileUrl.split('/').pop().split('?')[0] || 'document.pdf';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              window.URL.revokeObjectURL(url);
+                            } catch (error) {
+                              console.error('Download failed:', error);
+                              // Fallback: open in new tab
+                              window.open(msg.fileUrl, '_blank');
+                            }
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '16px',
+                            backgroundColor: msg.sender._id === user.id ? 'rgba(255,255,255,0.15)' : '#f3f4f6',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            marginBottom: msg.content ? '8px' : '0',
+                            border: `1px solid ${msg.sender._id === user.id ? 'rgba(255,255,255,0.3)' : '#e5e7eb'}`,
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.02)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '8px',
+                            backgroundColor: msg.sender._id === user.id ? 'rgba(255,255,255,0.2)' : '#e5e7eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <svg style={{ width: '28px', height: '28px', color: msg.sender._id === user.id ? 'white' : '#4f46e5' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '15px', fontWeight: '600', color: msg.sender._id === user.id ? 'white' : '#111827', marginBottom: '4px' }}>
+                              Document
+                            </div>
+                            <div style={{ fontSize: '13px', color: msg.sender._id === user.id ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>
+                              Click to download
+                            </div>
+                          </div>
+                          <svg style={{ width: '20px', height: '20px', color: msg.sender._id === user.id ? 'rgba(255,255,255,0.6)' : '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      ) : null}
+                      {msg.content && msg.content !== 'Sent a file' && <p style={{ margin: 0 }}>{msg.content}</p>}
                       <div className="message-footer">
                         <p className={`message-time ${msg.sender._id === user.id ? 'message-time-sent' : 'message-time-received'}`}>
                           {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
@@ -413,7 +555,34 @@ function Chat() {
 
             {/* Message Input */}
             <div className="message-input-container">
+              {selectedFile && (
+                <div style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', borderRadius: '8px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '14px', color: '#374151' }}>📎 {selectedFile.name}</span>
+                  <button
+                    onClick={() => setSelectedFile(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               <div className="message-input-wrapper">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/*,application/pdf,.doc,.docx"
+                  style={{ display: 'none' }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="attach-btn"
+                  title="Attach file"
+                >
+                  <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </button>
                 <input
                   type="text"
                   value={newMessage}
@@ -421,18 +590,25 @@ function Chat() {
                     setNewMessage(e.target.value);
                     handleTyping(true);
                   }}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  onKeyPress={(e) => e.key === 'Enter' && !uploading && sendMessage()}
                   placeholder="Type a message..."
                   className="message-input"
+                  disabled={uploading}
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={!newMessage.trim()}
+                  disabled={(!newMessage.trim() && !selectedFile) || uploading}
                   className="send-btn"
                 >
-                  <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
+                  {uploading ? (
+                    <svg className="icon" fill="none" viewBox="0 0 24 24">
+                      <circle className="spinner" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    </svg>
+                  ) : (
+                    <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -520,6 +696,65 @@ function Chat() {
           }}
           onClick={() => setShowMobileMenu(false)}
         />
+      )}
+
+      {/* Image Preview Modal */}
+      {imagePreview && (
+        <div
+          className="modal-overlay"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={() => setImagePreview(null)}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setImagePreview(null);
+            }}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '48px',
+              height: '48px',
+              cursor: 'pointer',
+              fontSize: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#111827',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+              zIndex: 101
+            }}
+          >
+            ×
+          </button>
+          <img
+            src={imagePreview}
+            alt="Preview"
+            style={{
+              maxWidth: '95%',
+              maxHeight: '95vh',
+              objectFit: 'contain',
+              borderRadius: '4px',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onError={(e) => {
+              console.error('Image failed to load:', imagePreview);
+              e.target.style.display = 'none';
+            }}
+          />
+        </div>
       )}
     </div>
   );

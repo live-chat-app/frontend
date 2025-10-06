@@ -447,6 +447,36 @@
   cursor: not-allowed;
 }
 
+.attach-btn {
+  background-color: transparent;
+  color: #6b7280;
+  padding: 8px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attach-btn:hover {
+  background-color: #f3f4f6;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Empty State */
 .empty-state {
   flex: 1;
