@@ -324,6 +324,30 @@ function Chat() {
     }
   };
 
+  const leaveChannel = async (channelId) => {
+    if (!confirm('Are you sure you want to leave this channel?')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/channels/${channelId}/leave`);
+      // Refresh channels to update member list
+      fetchChannels();
+      // Leave socket room
+      if (socket) {
+        socket.emit('leaveChannel', { channelId });
+      }
+      // Clear active chat if leaving the current channel
+      if (activeChat?.id === channelId) {
+        setActiveChat(null);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Failed to leave channel:', error);
+      alert('Failed to leave channel. Please try again.');
+    }
+  };
+
   const isChannelMember = (channel) => {
     if (!channel || !channel.members) {
       console.log('Channel missing or no members:', channel);
@@ -494,6 +518,26 @@ function Chat() {
                   )}
                 </div>
               </div>
+              {activeChat.type === 'channel' && activeChat.isMember !== false && (
+                <button
+                  onClick={() => leaveChannel(activeChat.id)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                >
+                  Leave Channel
+                </button>
+              )}
             </div>
 
             {/* Messages */}
