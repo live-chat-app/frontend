@@ -1,16 +1,47 @@
-# React + Vite
+# Live Chat Application - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Real-time chat application frontend built with React and Socket.io.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- User registration and login
+- Real-time messaging
+- Channel creation and management
+- Direct messaging
+- Typing indicators
+- Read receipts
+- Message reactions
+- File and image sharing
+- Online/offline status
+- Mobile responsive design
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React
+- Vite
+- Socket.io Client
+- Axios
+- React Router
+- date-fns
 
-## Expanding the ESLint configuration
+## Setup
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Update the API URL in `src/api/axios.js` if needed (default is http://localhost:3001)
+
+3. Run the application:
+```bash
+npm run dev
+```
+
+The application will run on http://localhost:5173
+
+## Build for Production
+
+```bash
+npm run build
+```
