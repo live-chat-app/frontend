@@ -154,6 +154,7 @@ function Chat() {
   const fetchChannels = async () => {
     try {
       const response = await api.get('/channels');
+      console.log('Fetched channels:', response.data);
       setChannels(response.data);
     } catch (error) {
       console.error('Failed to fetch channels:', error);
@@ -162,6 +163,12 @@ function Chat() {
 
   const loadMessages = async () => {
     try {
+      // Don't load messages if user is not a member of the channel
+      if (activeChat.type === 'channel' && activeChat.isMember === false) {
+        setMessages([]);
+        return;
+      }
+
       if (activeChat.type === 'channel') {
         const response = await api.get(`/messages/channel/${activeChat.id}`);
         setMessages(response.data.reverse());
@@ -275,8 +282,31 @@ function Chat() {
   };
 
   const joinChannel = async (channelId) => {
-    if (!socket) return;
-    socket.emit('joinChannel', { channelId });
+    try {
+      await api.post(`/channels/${channelId}/join`);
+      // Refresh channels to update member list
+      fetchChannels();
+      // Reload messages after joining
+      if (activeChat?.id === channelId) {
+        loadMessages();
+      }
+    } catch (error) {
+      console.error('Failed to join channel:', error);
+    }
+    // Also join socket room
+    if (socket) {
+      socket.emit('joinChannel', { channelId });
+    }
+  };
+
+  const isChannelMember = (channel) => {
+    if (!channel || !channel.members) {
+      console.log('Channel missing or no members:', channel);
+      return false;
+    }
+    const isMember = channel.members.some(member => member._id === user.id || member === user.id);
+    console.log(`Checking membership for channel ${channel.name}:`, isMember, 'members:', channel.members);
+    return isMember;
   };
 
   const addReaction = (messageId, emoji) => {
@@ -348,24 +378,42 @@ function Chat() {
               </button>
             </div>
 
-            {filteredChannels.map((channel) => (
-              <button
-                key={channel._id}
-                onClick={() => {
-                  setActiveChat({ id: channel._id, name: channel.name, type: 'channel' });
-                  joinChannel(channel._id);
-                }}
-                className={`chat-item ${activeChat?.id === channel._id ? 'chat-item-active' : ''}`}
-              >
-                <div className="channel-content">
-                  <span className="channel-hash">#</span>
-                  <span className="channel-name">{channel.name}</span>
-                </div>
-                {channel.description && (
-                  <p className="channel-description">{channel.description}</p>
-                )}
-              </button>
-            ))}
+            {filteredChannels.map((channel) => {
+              const isMember = isChannelMember(channel);
+              return (
+                <button
+                  key={channel._id}
+                  onClick={() => {
+                    setActiveChat({ id: channel._id, name: channel.name, type: 'channel', isMember });
+                    if (isMember) {
+                      socket?.emit('joinChannel', { channelId: channel._id });
+                    }
+                  }}
+                  className={`chat-item ${activeChat?.id === channel._id ? 'chat-item-active' : ''}`}
+                >
+                  <div className="channel-content">
+                    <span className="channel-hash">#</span>
+                    <span className="channel-name">{channel.name}</span>
+                    {!isMember && (
+                      <span style={{
+                        marginLeft: 'auto',
+                        fontSize: '11px',
+                        backgroundColor: '#4f46e5',
+                        color: 'white',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontWeight: '600'
+                      }}>
+                        Join
+                      </span>
+                    )}
+                  </div>
+                  {channel.description && (
+                    <p className="channel-description">{channel.description}</p>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Direct Messages */}
@@ -425,7 +473,55 @@ function Chat() {
 
             {/* Messages */}
             <div className="messages-container">
-              {messages.map((msg) => (
+              {activeChat.type === 'channel' && activeChat.isMember === false ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  padding: '40px'
+                }}>
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    backgroundColor: '#eef2ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '24px'
+                  }}>
+                    <svg style={{ width: '40px', height: '40px', color: '#4f46e5' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  </div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>
+                    Join #{activeChat.name}
+                  </h3>
+                  <p style={{ fontSize: '14px', color: '#6b7280', textAlign: 'center', marginBottom: '24px', maxWidth: '400px' }}>
+                    You need to join this channel to view and send messages
+                  </p>
+                  <button
+                    onClick={() => joinChannel(activeChat.id)}
+                    style={{
+                      backgroundColor: '#4f46e5',
+                      color: 'white',
+                      padding: '12px 32px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '15px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#4338ca'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#4f46e5'}
+                  >
+                    Join Channel
+                  </button>
+                </div>
+              ) : messages.map((msg) => (
                 <div
                   key={msg._id}
                   className={`message-wrapper ${msg.sender._id === user.id ? 'message-align-right' : 'message-align-left'}`}
@@ -554,6 +650,7 @@ function Chat() {
             </div>
 
             {/* Message Input */}
+            {(activeChat.type !== 'channel' || activeChat.isMember !== false) && (
             <div className="message-input-container">
               {selectedFile && (
                 <div style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', borderRadius: '8px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -612,6 +709,7 @@ function Chat() {
                 </button>
               </div>
             </div>
+            )}
           </>
         ) : (
           <>
