@@ -2,7 +2,9 @@
 .chat-container {
   display: flex;
   height: 100vh;
+  width: 100vw;
   background-color: #f3f4f6;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -254,6 +256,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
 }
 
 /* Chat Header */
@@ -301,6 +305,7 @@
 .messages-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   background-color: #f9fafb;
 }
@@ -320,6 +325,8 @@
 
 .message-content {
   max-width: 70%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .message-bubble {
@@ -604,11 +611,18 @@
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+  .chat-container {
+    overflow: hidden;
+    position: relative;
+  }
+
   .sidebar {
     width: 100%;
     position: fixed;
     z-index: 50;
     height: 100vh;
+    left: 0;
+    top: 0;
   }
 
   .sidebar-hidden {
@@ -617,6 +631,37 @@
 
   .sidebar-visible {
     display: flex;
+  }
+
+  .main-chat {
+    width: 100%;
+  }
+
+  .message-content {
+    max-width: 85%;
+  }
+
+  .chat-header {
+    padding: 12px;
+  }
+
+  .messages-container {
+    padding: 12px;
+  }
+
+  .message-input-container {
+    padding: 12px;
+  }
+}
+
+/* Tablet Responsive */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar {
+    width: 280px;
+  }
+
+  .message-content {
+    max-width: 75%;
   }
 }
 
