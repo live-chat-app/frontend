@@ -353,7 +353,11 @@ function Chat() {
       console.log('Channel missing or no members:', channel);
       return false;
     }
-    const isMember = channel.members.some(member => member._id === user.id || member === user.id);
+    // Handle new structure with userId field
+    const isMember = channel.members.some(member => {
+      const memberId = member.userId?._id || member.userId || member._id || member;
+      return memberId === user.id;
+    });
     console.log(`Checking membership for channel ${channel.name}:`, isMember, 'members:', channel.members);
     return isMember;
   };
