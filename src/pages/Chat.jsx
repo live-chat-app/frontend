@@ -23,6 +23,7 @@ function Chat() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [unreadCounts, setUnreadCounts] = useState({ directMessages: {}, channelMessages: {} });
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -32,6 +33,7 @@ function Chat() {
   useEffect(() => {
     fetchUsers();
     fetchChannels();
+    fetchUnreadCounts();
   }, []);
 
   // Socket listeners
@@ -67,6 +69,9 @@ function Chat() {
           }
         }
       }
+
+      // Refresh unread counts when a new message arrives
+      fetchUnreadCounts();
     };
 
     socket.on('newMessage', handleNewMessage);
@@ -126,6 +131,8 @@ function Chat() {
             : msg
         )
       );
+      // Refresh unread counts when a message is read
+      fetchUnreadCounts();
     });
 
     return () => {
@@ -168,6 +175,15 @@ function Chat() {
       setChannels(response.data);
     } catch (error) {
       console.error('Failed to fetch channels:', error);
+    }
+  };
+
+  const fetchUnreadCounts = async () => {
+    try {
+      const response = await api.get('/messages/unread-counts');
+      setUnreadCounts(response.data);
+    } catch (error) {
+      console.error('Failed to fetch unread counts:', error);
     }
   };
 
@@ -268,6 +284,9 @@ function Chat() {
     socket.emit('sendMessage', messageData);
     setNewMessage('');
     setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     handleTyping(false);
   };
 
@@ -460,6 +479,21 @@ function Chat() {
                         Join
                       </span>
                     )}
+                    {isMember && unreadCounts.channelMessages[channel._id] > 0 && (
+                      <span style={{
+                        marginLeft: 'auto',
+                        fontSize: '11px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontWeight: '600',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>
+                        {unreadCounts.channelMessages[channel._id]}
+                      </span>
+                    )}
                   </div>
                   {channel.description && (
                     <p className="channel-description">{channel.description}</p>
@@ -489,6 +523,21 @@ function Chat() {
                     <p className="user-name">{u.username}</p>
                     <p className="user-online-status">{u.isOnline ? 'Online' : 'Offline'}</p>
                   </div>
+                  {unreadCounts.directMessages[u._id] > 0 && (
+                    <span style={{
+                      marginLeft: 'auto',
+                      fontSize: '11px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontWeight: '600',
+                      minWidth: '20px',
+                      textAlign: 'center'
+                    }}>
+                      {unreadCounts.directMessages[u._id]}
+                    </span>
+                  )}
                 </div>
               </button>
             ))}
@@ -604,6 +653,7 @@ function Chat() {
                       {msg.sender._id !== user.id && (
                         <p className="message-sender">{msg.sender.username}</p>
                       )}
+                      {console.log('Message data:', { type: msg.type, fileUrl: msg.fileUrl, content: msg.content })}
                       {msg.type === 'image' && msg.fileUrl ? (
                         <div style={{ marginBottom: msg.content ? '8px' : '0' }}>
                           <img
