@@ -653,7 +653,6 @@ function Chat() {
                       {msg.sender._id !== user.id && (
                         <p className="message-sender">{msg.sender.username}</p>
                       )}
-                      {console.log('Message data:', { type: msg.type, fileUrl: msg.fileUrl, content: msg.content })}
                       {msg.type === 'image' && msg.fileUrl ? (
                         <div style={{ marginBottom: msg.content ? '8px' : '0' }}>
                           <img
