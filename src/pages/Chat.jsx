@@ -46,6 +46,11 @@ function Chat() {
       if (activeChat?.type === 'channel' && message.channelId) {
         if (message.channelId === activeChat.id || message.channelId._id === activeChat.id) {
           setMessages((prev) => [...prev, message]);
+
+          // ONLY mark as read if it's not from current user AND the chat is currently open
+          if (message.sender._id !== user.id && activeChat?.id === (message.channelId === activeChat.id ? activeChat.id : message.channelId._id)) {
+            socket.emit('markAsRead', { messageId: message._id });
+          }
         }
       }
       // For direct messages
@@ -55,6 +60,11 @@ function Chat() {
 
         if (senderId === activeChat.id || recipientId === activeChat.id || senderId === user.id) {
           setMessages((prev) => [...prev, message]);
+
+          // ONLY mark as read if it's from the active chat user AND that chat is currently open
+          if (senderId === activeChat.id && activeChat?.id === senderId) {
+            socket.emit('markAsRead', { messageId: message._id });
+          }
         }
       }
     };
@@ -130,12 +140,12 @@ function Chat() {
 
   // Load messages when active chat changes
   useEffect(() => {
-    if (activeChat) {
+    if (activeChat && socket) {
       loadMessages();
       setShowMobileMenu(false);
       setTypingUsers([]); // Clear typing indicators when switching chats
     }
-  }, [activeChat]);
+  }, [activeChat, socket]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -169,12 +179,27 @@ function Chat() {
         return;
       }
 
+      let loadedMessages = [];
       if (activeChat.type === 'channel') {
         const response = await api.get(`/messages/channel/${activeChat.id}`);
-        setMessages(response.data.reverse());
+        loadedMessages = response.data.reverse();
+        setMessages(loadedMessages);
       } else {
         const response = await api.get(`/messages/direct/${activeChat.id}`);
-        setMessages(response.data.reverse());
+        loadedMessages = response.data.reverse();
+        setMessages(loadedMessages);
+      }
+
+      // Mark unread messages as read
+      if (socket) {
+        loadedMessages.forEach((msg) => {
+          // Mark as read if message is from another user and not already read by current user
+          const alreadyRead = msg.readBy?.some(r => r.userId === user.id);
+          if (msg.sender._id !== user.id && !alreadyRead) {
+            console.log('Marking message as read:', msg._id);
+            socket.emit('markAsRead', { messageId: msg._id });
+          }
+        });
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -623,8 +648,14 @@ function Chat() {
                         <p className={`message-time ${msg.sender._id === user.id ? 'message-time-sent' : 'message-time-received'}`}>
                           {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                         </p>
-                        {msg.readBy?.length > 0 && msg.sender._id === user.id && (
-                          <span className="message-read">✓✓</span>
+                        {msg.sender._id === user.id && (
+                          <span style={{
+                            fontSize: '14px',
+                            marginLeft: '6px',
+                            color: msg.readBy?.length > 0 ? '#4ade80' : '#9ca3af'
+                          }}>
+                            {msg.readBy?.length > 0 ? '✓✓ Read' : '✓ Sent'}
+                          </span>
                         )}
                       </div>
                     </div>
