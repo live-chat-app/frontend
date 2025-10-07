@@ -24,6 +24,7 @@ function Chat() {
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [unreadCounts, setUnreadCounts] = useState({ directMessages: {}, channelMessages: {} });
+  const [lastMessageTime, setLastMessageTime] = useState({ users: {}, channels: {} });
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -47,6 +48,13 @@ function Chat() {
       // For channel messages
       if (activeChat?.type === 'channel' && message.channelId) {
         const channelId = message.channelId._id || message.channelId;
+
+        // Update last message time for this channel
+        setLastMessageTime(prev => ({
+          ...prev,
+          channels: { ...prev.channels, [channelId]: new Date(message.createdAt || Date.now()) }
+        }));
+
         if (channelId === activeChat.id) {
           setMessages((prev) => [...prev, message]);
 
@@ -72,6 +80,13 @@ function Chat() {
 
         // Only process if this message involves current user
         if (recipientId === user.id || senderId === user.id) {
+          // Update last message time for this user
+          const otherUserId = senderId === user.id ? recipientId : senderId;
+          setLastMessageTime(prev => ({
+            ...prev,
+            users: { ...prev.users, [otherUserId]: new Date(message.createdAt || Date.now()) }
+          }));
+
           // Add to messages if it's the active chat
           if (activeChat?.type === 'user' && (senderId === activeChat.id || recipientId === activeChat.id)) {
             setMessages((prev) => [...prev, message]);
@@ -421,13 +436,21 @@ function Chat() {
     socket.emit('messageReaction', { messageId, emoji });
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter((u) => u.username?.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      const timeA = lastMessageTime.users[a._id] || new Date(0);
+      const timeB = lastMessageTime.users[b._id] || new Date(0);
+      return timeB - timeA; // Most recent first
+    });
 
-  const filteredChannels = channels.filter((c) =>
-    c.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredChannels = channels
+    .filter((c) => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      const timeA = lastMessageTime.channels[a._id] || new Date(0);
+      const timeB = lastMessageTime.channels[b._id] || new Date(0);
+      return timeB - timeA; // Most recent first
+    });
 
   return (
     <div className="chat-container">
