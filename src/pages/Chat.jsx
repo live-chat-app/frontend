@@ -46,32 +46,53 @@ function Chat() {
 
       // For channel messages
       if (activeChat?.type === 'channel' && message.channelId) {
-        if (message.channelId === activeChat.id || message.channelId._id === activeChat.id) {
+        const channelId = message.channelId._id || message.channelId;
+        if (channelId === activeChat.id) {
           setMessages((prev) => [...prev, message]);
 
           // ONLY mark as read if it's not from current user AND the chat is currently open
-          if (message.sender._id !== user.id && activeChat?.id === (message.channelId === activeChat.id ? activeChat.id : message.channelId._id)) {
+          if (message.sender._id !== user.id) {
             socket.emit('markAsRead', { messageId: message._id });
           }
+        } else if (message.sender._id !== user.id) {
+          // Only increment unread count if message is from someone else and in a different channel
+          setUnreadCounts(prev => ({
+            ...prev,
+            channelMessages: {
+              ...prev.channelMessages,
+              [channelId]: (prev.channelMessages[channelId] || 0) + 1
+            }
+          }));
         }
       }
       // For direct messages
-      else if (activeChat?.type === 'user') {
+      else if (message.recipientId) {
         const senderId = message.sender._id || message.sender;
         const recipientId = message.recipientId?._id || message.recipientId;
 
-        if (senderId === activeChat.id || recipientId === activeChat.id || senderId === user.id) {
-          setMessages((prev) => [...prev, message]);
+        // Only process if this message involves current user
+        if (recipientId === user.id || senderId === user.id) {
+          // Add to messages if it's the active chat
+          if (activeChat?.type === 'user' && (senderId === activeChat.id || recipientId === activeChat.id)) {
+            setMessages((prev) => [...prev, message]);
 
-          // ONLY mark as read if it's from the active chat user AND that chat is currently open
-          if (senderId === activeChat.id && activeChat?.id === senderId) {
-            socket.emit('markAsRead', { messageId: message._id });
+            // Mark as read if from the active chat user
+            if (senderId === activeChat.id) {
+              socket.emit('markAsRead', { messageId: message._id });
+            }
+          }
+          // If message is for current user but NOT in active chat, increment count
+          else if (recipientId === user.id && senderId !== user.id) {
+            setUnreadCounts(prev => ({
+              ...prev,
+              directMessages: {
+                ...prev.directMessages,
+                [senderId]: (prev.directMessages[senderId] || 0) + 1
+              }
+            }));
           }
         }
       }
-
-      // Refresh unread counts when a new message arrives
-      fetchUnreadCounts();
     };
 
     socket.on('newMessage', handleNewMessage);
@@ -131,8 +152,7 @@ function Chat() {
             : msg
         )
       );
-      // Refresh unread counts when a message is read
-      fetchUnreadCounts();
+      // Don't fetch unread counts here - we manage them optimistically
     });
 
     return () => {
@@ -208,14 +228,29 @@ function Chat() {
 
       // Mark unread messages as read
       if (socket) {
+        let markedCount = 0;
         loadedMessages.forEach((msg) => {
           // Mark as read if message is from another user and not already read by current user
           const alreadyRead = msg.readBy?.some(r => r.userId === user.id);
           if (msg.sender._id !== user.id && !alreadyRead) {
             console.log('Marking message as read:', msg._id);
             socket.emit('markAsRead', { messageId: msg._id });
+            markedCount++;
           }
         });
+
+        // Clear unread count for this chat immediately (whether we marked messages or not)
+        if (activeChat.type === 'channel') {
+          setUnreadCounts(prev => ({
+            ...prev,
+            channelMessages: { ...prev.channelMessages, [activeChat.id]: 0 }
+          }));
+        } else {
+          setUnreadCounts(prev => ({
+            ...prev,
+            directMessages: { ...prev.directMessages, [activeChat.id]: 0 }
+          }));
+        }
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -553,7 +588,10 @@ function Chat() {
             <div className="chat-header">
               <div className="chat-header-content">
                 <button
-                  onClick={() => setShowMobileMenu(true)}
+                  onClick={() => {
+                    setShowMobileMenu(true);
+                    setActiveChat(null);
+                  }}
                   className="menu-btn"
                 >
                   <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -843,7 +881,10 @@ function Chat() {
           <>
             <div className="chat-header">
               <button
-                onClick={() => setShowMobileMenu(true)}
+                onClick={() => {
+                  setShowMobileMenu(true);
+                  setActiveChat(null);
+                }}
                 className="menu-btn"
               >
                 <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
