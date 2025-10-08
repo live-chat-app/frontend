@@ -35,6 +35,7 @@ function Chat() {
     fetchUsers();
     fetchChannels();
     fetchUnreadCounts();
+    fetchLastMessageTimes();
   }, []);
 
   // Socket listeners
@@ -219,6 +220,15 @@ function Chat() {
       setUnreadCounts(response.data);
     } catch (error) {
       console.error('Failed to fetch unread counts:', error);
+    }
+  };
+
+  const fetchLastMessageTimes = async () => {
+    try {
+      const response = await api.get('/messages/last-message-times');
+      setLastMessageTime(response.data);
+    } catch (error) {
+      console.error('Failed to fetch last message times:', error);
     }
   };
 
