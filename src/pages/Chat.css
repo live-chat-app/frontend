@@ -407,6 +407,45 @@
   background-color: #f3f4f6;
 }
 
+/* Emoji Picker */
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% - 4px);
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  gap: 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  white-space: nowrap;
+}
+
+/* Emoji Picker for own messages (right side) - show to the left */
+.emoji-picker-own {
+  right: 0;
+}
+
+/* Emoji Picker for other messages (left side) - show to the right */
+.emoji-picker-other {
+  left: 0;
+}
+
+.emoji-option {
+  font-size: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.emoji-option:hover {
+  background-color: #f3f4f6;
+}
+
 /* Message Input */
 .message-input-container {
   background-color: white;

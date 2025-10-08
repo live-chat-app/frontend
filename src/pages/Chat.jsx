@@ -26,6 +26,7 @@ function Chat() {
   const [imagePreview, setImagePreview] = useState(null);
   const [unreadCounts, setUnreadCounts] = useState({ directMessages: {}, channelMessages: {} });
   const [lastMessageTime, setLastMessageTime] = useState({ users: {}, channels: {} });
+  const [showEmojiPicker, setShowEmojiPicker] = useState(null); // Store messageId when picker is open
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -474,7 +475,14 @@ function Chat() {
   const addReaction = (messageId, emoji) => {
     if (!socket) return;
     socket.emit('messageReaction', { messageId, emoji });
+    setShowEmojiPicker(null); // Close picker after selecting
   };
+
+  const toggleEmojiPicker = (messageId) => {
+    setShowEmojiPicker(showEmojiPicker === messageId ? null : messageId);
+  };
+
+  const reactionEmojis = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉'];
 
   const filteredUsers = users
     .filter((u) => u.username?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -871,12 +879,27 @@ function Chat() {
                           {reaction.emoji}
                         </span>
                       ))}
-                      <button
-                        onClick={() => addReaction(msg._id, '👍')}
-                        className="reaction-add-btn"
-                      >
-                        +
-                      </button>
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => toggleEmojiPicker(msg._id)}
+                          className="reaction-add-btn"
+                        >
+                          +
+                        </button>
+                        {showEmojiPicker === msg._id && (
+                          <div className={`emoji-picker ${msg.sender._id === user.id ? 'emoji-picker-own' : 'emoji-picker-other'}`}>
+                            {reactionEmojis.map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={() => addReaction(msg._id, emoji)}
+                                className="emoji-option"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
