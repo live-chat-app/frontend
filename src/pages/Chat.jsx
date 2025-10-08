@@ -43,11 +43,9 @@ function Chat() {
     if (!socket) return;
 
     const handleNewMessage = (message) => {
-      console.log('Received new message:', message);
-      console.log('Active chat:', activeChat);
 
       // For channel messages
-      if (activeChat?.type === 'channel' && message.channelId) {
+      if (message.channelId) {
         const channelId = message.channelId._id || message.channelId;
 
         // Update last message time for this channel
@@ -56,15 +54,18 @@ function Chat() {
           channels: { ...prev.channels, [channelId]: new Date(message.createdAt || Date.now()) }
         }));
 
-        if (channelId === activeChat.id) {
+        // If this is the active channel, add message to view and mark as read
+        if (activeChat?.type === 'channel' && channelId === activeChat.id) {
           setMessages((prev) => [...prev, message]);
 
           // ONLY mark as read if it's not from current user AND the chat is currently open
           if (message.sender._id !== user.id) {
             socket.emit('markAsRead', { messageId: message._id });
           }
-        } else if (message.sender._id !== user.id) {
-          // Only increment unread count if message is from someone else and in a different channel
+        }
+        // If it's a different channel or not viewing any channel, increment unread count
+        else if (message.sender._id !== user.id) {
+          // Only increment unread count if message is from someone else
           setUnreadCounts(prev => ({
             ...prev,
             channelMessages: {
@@ -114,7 +115,6 @@ function Chat() {
     socket.on('newMessage', handleNewMessage);
 
     socket.on('newUser', (newUser) => {
-      console.log('New user registered:', newUser);
       // Only add if not the current user and not already in list
       if (newUser._id !== user.id) {
         setUsers((prev) => {
@@ -207,7 +207,6 @@ function Chat() {
   const fetchChannels = async () => {
     try {
       const response = await api.get('/channels');
-      console.log('Fetched channels:', response.data);
       setChannels(response.data);
     } catch (error) {
       console.error('Failed to fetch channels:', error);
@@ -449,16 +448,16 @@ function Chat() {
   const filteredUsers = users
     .filter((u) => u.username?.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
-      const timeA = lastMessageTime.users[a._id] || new Date(0);
-      const timeB = lastMessageTime.users[b._id] || new Date(0);
+      const timeA = lastMessageTime.users?.[a._id] ? new Date(lastMessageTime.users[a._id]) : new Date(0);
+      const timeB = lastMessageTime.users?.[b._id] ? new Date(lastMessageTime.users[b._id]) : new Date(0);
       return timeB - timeA; // Most recent first
     });
 
   const filteredChannels = channels
     .filter((c) => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
-      const timeA = lastMessageTime.channels[a._id] || new Date(0);
-      const timeB = lastMessageTime.channels[b._id] || new Date(0);
+      const timeA = lastMessageTime.channels?.[a._id] ? new Date(lastMessageTime.channels[a._id]) : new Date(0);
+      const timeB = lastMessageTime.channels?.[b._id] ? new Date(lastMessageTime.channels[b._id]) : new Date(0);
       return timeB - timeA; // Most recent first
     });
 
