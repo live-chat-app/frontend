@@ -18,6 +18,7 @@ function Chat() {
   const [channelName, setChannelName] = useState('');
   const [channelDescription, setChannelDescription] = useState('');
   const [typingUsers, setTypingUsers] = useState([]);
+  const [sidebarTyping, setSidebarTyping] = useState({}); // { userId: true/false } for direct messages
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -134,7 +135,16 @@ function Chat() {
     });
 
     socket.on('userTyping', ({ userId, username, isTyping, channelId }) => {
-      // Only show typing for the current active chat
+      // Update sidebar typing indicator (works regardless of active chat)
+      if (!channelId) {
+        // Direct message typing - update sidebar
+        setSidebarTyping(prev => ({
+          ...prev,
+          [userId]: isTyping
+        }));
+      }
+
+      // Update active chat typing indicator (existing behavior)
       if (channelId && activeChat?.type === 'channel' && channelId === activeChat.id) {
         // Channel typing
         if (isTyping) {
@@ -588,7 +598,13 @@ function Chat() {
                   </div>
                   <div className="user-info">
                     <p className="user-name">{u.username}</p>
-                    <p className="user-online-status">{u.isOnline ? 'Online' : 'Offline'}</p>
+                    <p className="user-online-status">
+                      {sidebarTyping[u._id] ? (
+                        <span style={{ color: '#10b981', fontStyle: 'italic' }}>typing...</span>
+                      ) : (
+                        u.isOnline ? 'Online' : 'Offline'
+                      )}
+                    </p>
                   </div>
                   {unreadCounts.directMessages[u._id] > 0 && (
                     <span style={{
