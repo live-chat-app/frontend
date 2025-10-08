@@ -134,6 +134,17 @@ function Chat() {
       );
     });
 
+    socket.on('newChannel', (newChannel) => {
+      // Add new channel to the list if not already there
+      setChannels((prev) => {
+        const exists = prev.find(c => c._id === newChannel._id);
+        if (!exists) {
+          return [...prev, newChannel];
+        }
+        return prev;
+      });
+    });
+
     socket.on('userTyping', ({ userId, username, isTyping, channelId }) => {
       // Update sidebar typing indicator (works regardless of active chat)
       if (!channelId) {
@@ -185,6 +196,7 @@ function Chat() {
       socket.off('newMessage', handleNewMessage);
       socket.off('newUser');
       socket.off('userStatusChange');
+      socket.off('newChannel');
       socket.off('userTyping');
       socket.off('messageReactionUpdate');
       socket.off('messageRead');
@@ -267,7 +279,6 @@ function Chat() {
           // Mark as read if message is from another user and not already read by current user
           const alreadyRead = msg.readBy?.some(r => r.userId === user.id);
           if (msg.sender._id !== user.id && !alreadyRead) {
-            console.log('Marking message as read:', msg._id);
             socket.emit('markAsRead', { messageId: msg._id });
             markedCount++;
           }
@@ -331,7 +342,6 @@ function Chat() {
     if (selectedFile) {
       fileData = await uploadFile();
       if (!fileData) return; // Upload failed
-      console.log('Uploaded file data:', fileData);
     }
 
     // Determine message type based on file format, not resourceType
@@ -349,7 +359,6 @@ function Chat() {
       fileUrl: fileData ? fileData.url : null,
     };
 
-    console.log('Sending message:', messageData);
     socket.emit('sendMessage', messageData);
     setNewMessage('');
     setSelectedFile(null);
@@ -397,18 +406,32 @@ function Chat() {
   const joinChannel = async (channelId) => {
     try {
       await api.post(`/channels/${channelId}/join`);
-      // Refresh channels to update member list
-      fetchChannels();
-      // Reload messages after joining
-      if (activeChat?.id === channelId) {
+
+      // Find the channel details
+      const channel = channels.find(c => c._id === channelId);
+
+      // Automatically navigate to the channel chat
+      if (channel) {
+        setActiveChat({
+          id: channelId,
+          name: channel.name,
+          type: 'channel',
+          isMember: true
+        });
+
+        // Join socket room
+        if (socket) {
+          socket.emit('joinChannel', { channelId });
+        }
+
+        // Load messages for this channel
         loadMessages();
       }
+
+      // Refresh channels to update member list
+      fetchChannels();
     } catch (error) {
       console.error('Failed to join channel:', error);
-    }
-    // Also join socket room
-    if (socket) {
-      socket.emit('joinChannel', { channelId });
     }
   };
 
@@ -438,7 +461,6 @@ function Chat() {
 
   const isChannelMember = (channel) => {
     if (!channel || !channel.members) {
-      console.log('Channel missing or no members:', channel);
       return false;
     }
     // Handle new structure with userId field
@@ -446,7 +468,6 @@ function Chat() {
       const memberId = member.userId?._id || member.userId || member._id || member;
       return memberId === user.id;
     });
-    console.log(`Checking membership for channel ${channel.name}:`, isMember, 'members:', channel.members);
     return isMember;
   };
 
